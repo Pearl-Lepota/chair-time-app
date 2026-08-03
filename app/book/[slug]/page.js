@@ -121,7 +121,28 @@ export default function BookingPage() {
     const { error } = await supabase.from('bookings').insert(booking);
     setSubmitting(false);
     if (error) { alert('Something went wrong booking that slot — it may have just been taken. Please try another time.'); return; }
+const finalStaffName = staff.find((p) => p.id === finalStaffId)?.name;
 
+    // Best-effort email — never blocks the booking itself if it fails.
+    if (phone.includes('@')) {
+      fetch('/api/send-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: phone,
+          customerName: name,
+          salonName: salon.name,
+          serviceName: service.name,
+          date,
+          time: minutesToLabel(timeStrToMinutes(time)).full,
+          staffName: finalStaffName,
+          confirmationCode: code,
+          depositAmount: rand(deposit),
+          balanceDue: rand(isCash ? priceRand : priceRand - deposit),
+          depositPaid: !isCash,
+        }),
+      }).catch(() => {});
+    }
     setConfirmed({ ...booking, staffName: staff.find((p) => p.id === finalStaffId)?.name, serviceName: service.name, priceRand });
   }
 
