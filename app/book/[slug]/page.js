@@ -77,7 +77,7 @@ export default function BookingPage() {
   }, [service, staffPool]);
 
   useEffect(() => {
-    if (step === 4 && date) loadSlots(date, staffId);
+   if (step === 3 && date) loadSlots(date, staffId);
   }, [step, date, staffId, loadSlots]);
 
   async function handleConfirm() {
