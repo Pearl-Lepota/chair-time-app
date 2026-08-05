@@ -1,6 +1,6 @@
 import { requireSalon } from '@/lib/get-salon';
 import { CATEGORY_LIST, CATEGORY_COLORS } from '@/lib/booking-logic';
-import { addStaff, removeStaff } from './actions';
+import { addStaff, removeStaff, updateCommission } from './actions';
 
 export default async function StaffPage() {
   const { supabase, salon } = await requireSalon();
@@ -17,7 +17,7 @@ export default async function StaffPage() {
 
       <form action={addStaff} className="bg-paper2 border border-dashed border-ink40 rounded-xl p-5 mb-8">
         <div className="font-mono text-xs uppercase tracking-wider text-ink60 font-semibold mb-3">Add a team member</div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
           <div>
             <label className="field-label">Name</label>
             <input name="name" required className="field-input" placeholder="Devon Marsh" />
@@ -29,6 +29,10 @@ export default async function StaffPage() {
           <div>
             <label className="field-label">Tag color</label>
             <input name="color" type="color" defaultValue="#2F4A3C" className="field-input h-[42px]" />
+          </div>
+          <div>
+            <label className="field-label">Commission %</label>
+            <input name="commission_rate" type="number" min="0" max="100" step="1" defaultValue="40" className="field-input" />
           </div>
         </div>
         <label className="field-label">Books for which categories?</label>
@@ -47,7 +51,7 @@ export default async function StaffPage() {
       {(!staff || staff.length === 0) && <p className="text-ink60 text-sm">No team members yet.</p>}
 
       {(staff || []).map((person) => (
-        <div key={person.id} className="flex items-center justify-between bg-white border border-line rounded-xl px-4 py-3.5 mb-2">
+        <div key={person.id} className="flex items-center justify-between bg-white border border-line rounded-xl px-4 py-3.5 mb-2 flex-wrap gap-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-display font-semibold text-sm"
               style={{ background: person.color }}>
@@ -64,10 +68,20 @@ export default async function StaffPage() {
               </div>
             </div>
           </div>
-          <form action={removeStaff}>
-            <input type="hidden" name="id" value={person.id} />
-            <button className="text-rose text-xs font-semibold border border-rose-soft rounded-lg px-3 py-1.5 hover:bg-rose-soft">Remove</button>
-          </form>
+          <div className="flex items-center gap-3">
+            <form action={updateCommission} className="flex items-center gap-1.5">
+              <input type="hidden" name="id" value={person.id} />
+              <label className="text-xs text-ink60 font-mono">Commission</label>
+              <input name="commission_rate" type="number" min="0" max="100" step="1" defaultValue={person.commission_rate ?? 40}
+                className="w-16 text-sm font-mono border border-line rounded-lg px-2 py-1.5" />
+              <span className="text-xs text-ink60">%</span>
+              <button className="text-xs font-semibold text-green-dark underline">Save</button>
+            </form>
+            <form action={removeStaff}>
+              <input type="hidden" name="id" value={person.id} />
+              <button className="text-rose text-xs font-semibold border border-rose-soft rounded-lg px-3 py-1.5 hover:bg-rose-soft">Remove</button>
+            </form>
+          </div>
         </div>
       ))}
     </div>
