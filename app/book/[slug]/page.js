@@ -33,6 +33,7 @@ export default function BookingPage() {
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [confirmed, setConfirmed] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showLanding, setShowLanding] = useState(true);
 
   useEffect(() => {
     async function load() {
@@ -77,7 +78,7 @@ export default function BookingPage() {
   }, [service, staffPool]);
 
   useEffect(() => {
-   if (step === 3 && date) loadSlots(date, staffId);
+    if (step === 3 && date) loadSlots(date, staffId);
   }, [step, date, staffId, loadSlots]);
 
   async function handleConfirm() {
@@ -121,7 +122,8 @@ export default function BookingPage() {
     const { error } = await supabase.from('bookings').insert(booking);
     setSubmitting(false);
     if (error) { alert('Something went wrong booking that slot — it may have just been taken. Please try another time.'); return; }
-const finalStaffName = staff.find((p) => p.id === finalStaffId)?.name;
+
+    const finalStaffName = staff.find((p) => p.id === finalStaffId)?.name;
 
     // Best-effort email — never blocks the booking itself if it fails.
     if (phone.includes('@')) {
@@ -143,7 +145,8 @@ const finalStaffName = staff.find((p) => p.id === finalStaffId)?.name;
         }),
       }).catch(() => {});
     }
-    setConfirmed({ ...booking, staffName: staff.find((p) => p.id === finalStaffId)?.name, serviceName: service.name, priceRand });
+
+    setConfirmed({ ...booking, staffName: finalStaffName, serviceName: service.name, priceRand });
   }
 
   if (loading) return <Center>Loading…</Center>;
@@ -151,16 +154,20 @@ const finalStaffName = staff.find((p) => p.id === finalStaffId)?.name;
 
   return (
     <main className="min-h-screen px-5 pb-16">
-      <div className="max-w-2xl mx-auto pt-8">
-        <div className="font-display italic text-xl text-green-dark mb-1">{salon.name}</div>
+      <div className={showLanding && !confirmed ? "max-w-4xl mx-auto pt-8" : "max-w-2xl mx-auto pt-8"}>
+        <div className="font-display italic text-xl text-ink mb-1">{salon.name}</div>
         {confirmed ? (
           <Confirmation booking={confirmed} onBookAnother={() => {
             setConfirmed(null); setStep(1); setCategory(null); setServiceId(null);
             setStaffId(null); setDate(null); setTime(null); setName(''); setPhone('');
+            setShowLanding(true);
           }} />
+        ) : showLanding ? (
+          <Landing salon={salon} services={services} onBook={() => setShowLanding(false)} />
         ) : (
           <>
-            <h1 className="font-display text-3xl font-semibold mb-1 mt-4">Reserve your spot</h1>
+            <button onClick={() => setShowLanding(true)} className="btn-ghost text-xs px-3 py-1.5 mb-5">← Back to {salon.name}</button>
+            <h1 className="font-display text-3xl font-semibold mb-1">Reserve your spot</h1>
             <p className="text-ink60 text-sm mb-6">A few quick steps and you're on the books.</p>
             <StepDots step={step} />
             {step === 1 && !category && (
@@ -216,6 +223,87 @@ const finalStaffName = staff.find((p) => p.id === finalStaffId)?.name;
 
 function Center({ children }) {
   return <div className="min-h-screen flex items-center justify-center text-ink60">{children}</div>;
+}
+
+function Landing({ salon, services, onBook }) {
+  const byCategory = CATEGORY_LIST
+    .map((cat) => ({ cat, items: services.filter((s) => s.category === cat) }))
+    .filter((g) => g.items.length > 0);
+
+  return (
+    <div>
+      {/* Hero */}
+      <div className="grid md:grid-cols-2 gap-10 items-center py-10">
+        <div>
+          <div className="font-mono text-xs uppercase tracking-wider text-brass font-semibold mb-3">Welcome</div>
+          <h1 className="font-display text-4xl font-semibold mb-4">Your chair, always on schedule.</h1>
+          <p className="text-ink60 text-base mb-8 max-w-md">
+            Book your next appointment at {salon.name} in a couple of taps — pick a service, a stylist, a time, and you're on the books.
+          </p>
+          <button onClick={onBook} className="btn-primary">Book an appointment</button>
+        </div>
+        <div className="aspect-[4/5] rounded-3xl bg-rose-soft flex items-center justify-center border border-line">
+          <span className="font-mono text-xs uppercase text-ink60 px-6 text-center">Your salon's hero photo goes here</span>
+        </div>
+      </div>
+
+      {/* Services gallery */}
+      <div className="py-10">
+        <div className="font-mono text-xs uppercase tracking-wider text-brass font-semibold mb-1">What we offer</div>
+        <h2 className="font-display text-2xl font-semibold mb-6">Every chair, every service.</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {byCategory.map(({ cat, items }) => (
+            <button key={cat} onClick={onBook} className="text-left">
+              <div className="h-36 rounded-2xl bg-brass-soft flex items-center justify-center border border-line mb-3">
+                <span className="text-2xl">{CATEGORY_META[cat]}</span>
+              </div>
+              <div className="font-display font-semibold text-sm">{cat}</div>
+              <div className="font-mono text-[11px] text-ink60">{items.length} option{items.length !== 1 ? 's' : ''}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Testimonials */}
+      <div className="py-10 bg-paper2 rounded-3xl border border-line px-8">
+        <div className="font-mono text-xs uppercase tracking-wider text-brass font-semibold mb-1">From clients</div>
+        <h2 className="font-display text-2xl font-semibold mb-6">Booked, seen, done well.</h2>
+        <div className="grid md:grid-cols-2 gap-4">
+          <Testimonial quote="Booked my appointment on my phone in under two minutes. Got a reminder the morning of." who="A recent client" />
+          <Testimonial quote="Loved that I could see exactly which stylist was free before picking a time." who="A recent client" />
+        </div>
+      </div>
+
+      {/* Location */}
+      <div className="py-10">
+        <div className="font-mono text-xs uppercase tracking-wider text-brass font-semibold mb-1">Find us</div>
+        <h2 className="font-display text-2xl font-semibold mb-6">{salon.name}</h2>
+        <div className="grid md:grid-cols-2 rounded-3xl overflow-hidden border border-line">
+          <div className="h-56 md:h-auto bg-rose-soft flex items-center justify-center">
+            <span className="font-mono text-xs uppercase text-ink60 px-6 text-center">Map / storefront photo</span>
+          </div>
+          <div className="bg-white p-8">
+            <p className="text-sm text-ink60 mb-3"><strong className="text-ink block">Address</strong> Add your salon's address in Settings</p>
+            <p className="text-sm text-ink60"><strong className="text-ink block">Hours</strong> Mon–Sat 9am–6pm, closed Sundays</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="text-center pb-2">
+        <button onClick={onBook} className="btn-primary">Book an appointment</button>
+      </div>
+    </div>
+  );
+}
+
+function Testimonial({ quote, who }) {
+  return (
+    <div className="border border-line rounded-2xl p-5 bg-white">
+      <div className="text-brass text-sm mb-2">★★★★★</div>
+      <p className="text-sm text-ink mb-3">"{quote}"</p>
+      <div className="font-display font-semibold text-sm">{who}</div>
+    </div>
+  );
 }
 
 function StepDots({ step }) {
