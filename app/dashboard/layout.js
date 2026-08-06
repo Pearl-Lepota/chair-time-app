@@ -14,10 +14,12 @@ export default async function DashboardLayout({ children }) {
               {salon.name}
             </span>
           </div>
-          <nav className="flex items-center gap-1 bg-white border border-line rounded-full p-1">
-            <a href="/dashboard/schedule" className="text-sm font-semibold text-ink60 hover:text-ink px-4 py-2 rounded-full">Schedule</a>
-            <a href="/dashboard/services" className="text-sm font-semibold text-ink60 hover:text-ink px-4 py-2 rounded-full">Services</a>
-            <a href="/dashboard/staff" className="text-sm font-semibold text-ink60 hover:text-ink px-4 py-2 rounded-full">Staff</a>
+          <nav className="flex items-center gap-1 bg-white border border-line rounded-full p-1 overflow-x-auto max-w-full">
+            <a href="/dashboard/analytics" className="text-sm font-semibold text-ink60 hover:text-ink px-4 py-2 rounded-full whitespace-nowrap">Analytics</a>
+            <a href="/dashboard/schedule" className="text-sm font-semibold text-ink60 hover:text-ink px-4 py-2 rounded-full whitespace-nowrap">Schedule</a>
+            <a href="/dashboard/services" className="text-sm font-semibold text-ink60 hover:text-ink px-4 py-2 rounded-full whitespace-nowrap">Services</a>
+            <a href="/dashboard/staff" className="text-sm font-semibold text-ink60 hover:text-ink px-4 py-2 rounded-full whitespace-nowrap">Staff</a>
+            <a href="/dashboard/commissions" className="text-sm font-semibold text-ink60 hover:text-ink px-4 py-2 rounded-full whitespace-nowrap">Commissions</a>
           </nav>
           <SignOutButton />
         </div>
