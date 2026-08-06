@@ -7,15 +7,20 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        paper: '#F5F0E6',
-        paper2: '#EBE2CE',
-        ink: '#262019',
-        ink60: 'rgba(38,32,25,0.62)',
-        ink40: 'rgba(38,32,25,0.4)',
-        green: { DEFAULT: '#2F4A3C', dark: '#1E2F27', soft: '#DCE5DD' },
-        brass: { DEFAULT: '#B8863B', soft: '#F1E3C6' },
-        rose: { DEFAULT: '#B4485F', soft: '#F3DEE2' },
-        line: '#DCD1B9',
+        // Brand palette: white / black / gold / blush pink / light grey.
+        // Token names below are historical (from earlier design passes) but
+        // now map to this palette — e.g. "green" renders as black, "brass"
+        // renders as gold. Renamed the values, not every class name, to
+        // avoid touching every file.
+        paper: '#FFFFFF',           // main background — white
+        paper2: '#EDEDEA',          // secondary background — light grey
+        ink: '#171310',             // primary text — near-black
+        ink60: 'rgba(23,19,16,0.62)',
+        ink40: 'rgba(23,19,16,0.42)',
+        green: { DEFAULT: '#171310', dark: '#000000', soft: '#F6EEDA' }, // "primary" = black, soft = pale gold highlight
+        brass: { DEFAULT: '#C9A227', soft: '#F3E6C2' },  // gold
+        rose: { DEFAULT: '#D98CA5', soft: '#FBE4EC' },   // blush pink
+        line: '#E2DFD9',            // borders — light grey
       },
       fontFamily: {
         display: ['Fraunces', 'serif'],
