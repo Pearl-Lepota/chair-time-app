@@ -261,8 +261,12 @@ function Landing({ salon, services, onBook }) {
           </p>
           <button onClick={onBook} className="btn-primary">Book an appointment</button>
         </div>
-        <div className="aspect-[4/5] rounded-3xl bg-rose-soft flex items-center justify-center border border-line">
-          <span className="font-mono text-xs uppercase text-ink60 px-6 text-center">Your salon's hero photo goes here</span>
+        <div className="aspect-[4/5] rounded-3xl overflow-hidden border border-line bg-rose-soft flex items-center justify-center">
+          {salon.hero_photo_url ? (
+            <img src={salon.hero_photo_url} alt={salon.name} className="w-full h-full object-cover" />
+          ) : (
+            <span className="font-mono text-xs uppercase text-ink60 px-6 text-center">Your salon's hero photo goes here</span>
+          )}
         </div>
       </div>
 
@@ -307,12 +311,17 @@ function Landing({ salon, services, onBook }) {
         <div className="font-mono text-xs uppercase tracking-wider text-brass font-semibold mb-1">Find us</div>
         <h2 className="font-display text-2xl font-semibold mb-6">{salon.name}</h2>
         <div className="grid md:grid-cols-2 rounded-3xl overflow-hidden border border-line">
-          <div className="h-56 md:h-auto bg-rose-soft flex items-center justify-center">
-            <span className="font-mono text-xs uppercase text-ink60 px-6 text-center">Map / storefront photo</span>
+          <div className="h-56 md:h-auto bg-rose-soft flex items-center justify-center overflow-hidden">
+            {salon.location_photo_url ? (
+              <img src={salon.location_photo_url} alt={`${salon.name} location`} className="w-full h-full object-cover" />
+            ) : (
+              <span className="font-mono text-xs uppercase text-ink60 px-6 text-center">Map / storefront photo</span>
+            )}
           </div>
           <div className="bg-white p-8">
-            <p className="text-sm text-ink60 mb-3"><strong className="text-ink block">Address</strong> Add your salon's address in Settings</p>
-            <p className="text-sm text-ink60"><strong className="text-ink block">Hours</strong> Mon–Sat 9am–6pm, closed Sundays</p>
+            <p className="text-sm text-ink60 mb-3"><strong className="text-ink block">Address</strong> {salon.address || 'Add your salon\'s address in Settings'}</p>
+            {salon.phone && <p className="text-sm text-ink60 mb-3"><strong className="text-ink block">Phone</strong> {salon.phone}</p>}
+            <p className="text-sm text-ink60"><strong className="text-ink block">Hours</strong> {salon.hours_text || 'Mon–Sat 9am–6pm, closed Sundays'}</p>
           </div>
         </div>
       </div>
