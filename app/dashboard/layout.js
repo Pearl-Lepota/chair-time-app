@@ -20,6 +20,7 @@ export default async function DashboardLayout({ children }) {
             <a href="/dashboard/services" className="text-sm font-semibold text-ink60 hover:text-ink px-4 py-2 rounded-full whitespace-nowrap">Services</a>
             <a href="/dashboard/staff" className="text-sm font-semibold text-ink60 hover:text-ink px-4 py-2 rounded-full whitespace-nowrap">Staff</a>
             <a href="/dashboard/commissions" className="text-sm font-semibold text-ink60 hover:text-ink px-4 py-2 rounded-full whitespace-nowrap">Commissions</a>
+            <a href="/dashboard/settings" className="text-sm font-semibold text-ink60 hover:text-ink px-4 py-2 rounded-full whitespace-nowrap">Settings</a>
           </nav>
           <SignOutButton />
         </div>
