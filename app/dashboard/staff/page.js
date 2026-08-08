@@ -1,6 +1,7 @@
 import { requireSalon } from '@/lib/get-salon';
-import { CATEGORY_LIST, CATEGORY_COLORS } from '@/lib/booking-logic';
+import { CATEGORY_COLORS } from '@/lib/booking-logic';
 import { addStaff, removeStaff, updateCommission } from './actions';
+import StaffForm from './StaffForm';
 
 export default async function StaffPage() {
   const { supabase, salon } = await requireSalon();
@@ -15,40 +16,13 @@ export default async function StaffPage() {
       <div className="font-mono text-xs uppercase tracking-wider text-brass font-semibold mb-1">Staff</div>
       <h1 className="font-display text-3xl font-semibold mb-6">Your team</h1>
 
-      <form action={addStaff} className="bg-paper2 border border-dashed border-ink40 rounded-xl p-5 mb-8">
-        <div className="font-mono text-xs uppercase tracking-wider text-ink60 font-semibold mb-3">Add a team member</div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
-          <div>
-            <label className="field-label">Name</label>
-            <input name="name" required className="field-input" placeholder="Devon Marsh" />
-          </div>
-          <div>
-            <label className="field-label">Specialty</label>
-            <input name="specialty" className="field-input" placeholder="Extensions" />
-          </div>
-          <div>
-            <label className="field-label">Tag color</label>
-            <input name="color" type="color" defaultValue="#2F4A3C" className="field-input h-[42px]" />
-          </div>
-          <div>
-            <label className="field-label">Commission %</label>
-            <input name="commission_rate" type="number" min="0" max="100" step="1" defaultValue="40" className="field-input" />
-          </div>
-        </div>
-        <label className="field-label">Books for which categories?</label>
-        <div className="flex flex-wrap gap-2 mb-4">
-          {CATEGORY_LIST.map((cat) => (
-            <label key={cat} className="flex items-center gap-1.5 text-xs font-semibold bg-white border border-line rounded-full px-3 py-1.5 cursor-pointer"
-              style={{ borderColor: CATEGORY_COLORS[cat] }}>
-              <input type="checkbox" name="skills" value={cat} className="accent-current" />
-              {cat}
-            </label>
-          ))}
-        </div>
-        <button className="btn-primary">+ Add team member</button>
-      </form>
+      <StaffForm addStaff={addStaff} />
 
-      {(!staff || staff.length === 0) && <p className="text-ink60 text-sm">No team members yet.</p>}
+      {(!staff || staff.length === 0) && (
+        <p className="text-rose text-sm font-semibold bg-rose-soft border border-rose rounded-xl px-4 py-3 mb-2">
+          No team members yet — clients won't be able to book anything until at least one is added above.
+        </p>
+      )}
 
       {(staff || []).map((person) => (
         <div key={person.id} className="flex items-center justify-between bg-white border border-line rounded-xl px-4 py-3.5 mb-2 flex-wrap gap-3">
