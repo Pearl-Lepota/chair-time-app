@@ -1,15 +1,21 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
   CATEGORY_LIST, CATEGORY_COLORS, CATEGORY_META, rand, centsToRand,
   depositFor, timeStrToMinutes, minutesToTimeStr, minutesToLabel,
-  generateAvailableSlots, genConfirmationCode, isClosed,
+  generateAvailableSlots, genConfirmationCode,
 } from '@/lib/booking-logic';
 
-function isoToday() { return new Date().toISOString().slice(0, 10); }
+// Local-calendar-day date string — deliberately NOT toISOString(), which
+// shifts to UTC and can land on the wrong day depending on timezone/time
+// of night. Every date used for booking logic should go through this.
+function ymd(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function isoToday() { return ymd(new Date()); }
 
 export default function BookingPage() {
   const { slug } = useParams();
@@ -27,13 +33,18 @@ export default function BookingPage() {
   const [staffId, setStaffId] = useState(null);
   const [date, setDate] = useState(null);
   const [time, setTime] = useState(null);
-  const [slots, setSlots] = useState([]);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [confirmed, setConfirmed] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [showLanding, setShowLanding] = useState(true);
+
+  const today = useMemo(() => new Date(), []);
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth()); // 0-indexed
+  const [monthTaken, setMonthTaken] = useState([]);
+  const [monthLoading, setMonthLoading] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -55,31 +66,35 @@ export default function BookingPage() {
   const eligibleStaff = service ? staff.filter((p) => (p.skills || []).includes(service.category)) : [];
   const staffPool = eligibleStaff.length ? eligibleStaff : staff;
 
-  const loadSlots = useCallback(async (d, staffChoice) => {
-    if (!service || !d) { setSlots([]); return; }
-    if (isClosed(d)) { setSlots([]); return; }
+  // Fetch the whole visible month's bookings in one call, for whichever
+  // staff member(s) are relevant, whenever we're on the date step or the
+  // visible month/staff selection changes.
+  const loadMonth = useCallback(async (year, month, staffChoice) => {
+    if (!service) { setMonthTaken([]); return; }
     const pool = staffChoice === 'any' ? staffPool : staffPool.filter((p) => p.id === staffChoice);
-    const now = new Date();
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-
-    const results = await Promise.all(
-      pool.map((p) => supabase.rpc('get_taken_slots', { p_staff_id: p.id, p_date: d }))
-    );
-    const combinedTaken = pool.map((p, i) => ({
-      staffId: p.id,
-      taken: results[i].data || [],
-    }));
-
-    const set = new Set();
-    combinedTaken.forEach(({ taken }) => {
-      generateAvailableSlots(d, service.duration_minutes, taken, isoToday(), nowMinutes).forEach((m) => set.add(m));
-    });
-    setSlots(Array.from(set).sort((a, b) => a - b));
+    const ids = pool.map((p) => p.id);
+    if (ids.length === 0) { setMonthTaken([]); return; }
+    setMonthLoading(true);
+    const start = ymd(new Date(year, month, 1));
+    const end = ymd(new Date(year, month + 1, 0)); // last day of month
+    const { data } = await supabase.rpc('get_month_taken_slots', { p_staff_ids: ids, p_start: start, p_end: end });
+    setMonthTaken(data || []);
+    setMonthLoading(false);
   }, [service, staffPool]);
 
   useEffect(() => {
-    if (step === 3 && date) loadSlots(date, staffId);
-  }, [step, date, staffId, loadSlots]);
+    if (step === 3) loadMonth(viewYear, viewMonth, staffId);
+  }, [step, viewYear, viewMonth, staffId, loadMonth]);
+
+  // Slots for whichever day is currently selected, derived from the
+  // already-fetched month data — no extra network call needed.
+  const daySlots = useMemo(() => {
+    if (!date || !service) return [];
+    const taken = monthTaken.filter((b) => b.booking_date === date)
+      .map((b) => ({ start_minutes: b.start_minutes, duration_minutes: b.duration_minutes }));
+    const nowMinutes = today.getHours() * 60 + today.getMinutes();
+    return generateAvailableSlots(date, service.duration_minutes, taken, isoToday(), nowMinutes);
+  }, [date, service, monthTaken, today]);
 
   async function handleConfirm() {
     setSubmitting(true);
@@ -191,7 +206,11 @@ export default function BookingPage() {
             )}
             {step === 3 && (
               <DateTimeStep
-                date={date} time={time} slots={slots}
+                date={date} time={time} slots={daySlots}
+                viewYear={viewYear} viewMonth={viewMonth}
+                onMonthChange={(y, m) => { setViewYear(y); setViewMonth(m); }}
+                monthTaken={monthTaken} monthLoading={monthLoading}
+                duration={service?.duration_minutes}
                 onDate={(d) => { setDate(d); setTime(null); }}
                 onTime={setTime}
                 onBack={() => setStep(2)}
@@ -247,19 +266,28 @@ function Landing({ salon, services, onBook }) {
         </div>
       </div>
 
-      {/* Services gallery */}
+      {/* Services list */}
       <div className="py-10">
         <div className="font-mono text-xs uppercase tracking-wider text-brass font-semibold mb-1">What we offer</div>
         <h2 className="font-display text-2xl font-semibold mb-6">Every chair, every service.</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="border border-line rounded-2xl overflow-hidden divide-y divide-line">
           {byCategory.map(({ cat, items }) => (
-            <button key={cat} onClick={onBook} className="text-left">
-              <div className="h-36 rounded-2xl bg-brass-soft flex items-center justify-center border border-line mb-3">
-                <span className="text-2xl">{CATEGORY_META[cat]}</span>
+            <div key={cat}>
+              <div className="bg-paper2 px-5 py-2.5 flex items-center gap-2">
+                <span className="text-base">{CATEGORY_META[cat]}</span>
+                <span className="font-display font-semibold text-sm">{cat}</span>
               </div>
-              <div className="font-display font-semibold text-sm">{cat}</div>
-              <div className="font-mono text-[11px] text-ink60">{items.length} option{items.length !== 1 ? 's' : ''}</div>
-            </button>
+              {items.map((svc) => (
+                <button key={svc.id} onClick={onBook}
+                  className="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-paper2 transition text-left border-t border-line">
+                  <div>
+                    <div className="font-display font-semibold text-sm">{svc.name}</div>
+                    <div className="font-mono text-[11px] text-ink60">{svc.duration_minutes} min</div>
+                  </div>
+                  <div className="font-mono text-sm text-brass font-semibold">{rand(centsToRand(svc.price_cents))}</div>
+                </button>
+              ))}
+            </div>
           ))}
         </div>
       </div>
@@ -391,28 +419,85 @@ function StaffStep({ service, staffPool, staffId, onPick, onBack, onNext }) {
   );
 }
 
-function DateTimeStep({ date, time, slots, onDate, onTime, onBack, onNext }) {
-  const days = Array.from({ length: 14 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() + i);
-    return d.toISOString().slice(0, 10);
-  });
+function DateTimeStep({ date, time, slots, viewYear, viewMonth, onMonthChange, monthTaken, monthLoading, duration, onDate, onTime, onBack, onNext }) {
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const nowMinutes = today.getHours() * 60 + today.getMinutes();
+
+  const firstOfMonth = new Date(viewYear, viewMonth, 1);
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const startWeekday = firstOfMonth.getDay(); // 0 = Sunday
+  const monthLabel = firstOfMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  function dayStatus(dayNum) {
+    const dStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+    const dObj = new Date(viewYear, viewMonth, dayNum);
+    if (dStr < todayStr) return { status: 'past', dStr };
+    if (dObj.getDay() === 0) return { status: 'closed', dStr };
+    if (!duration) return { status: 'available', dStr };
+    const taken = monthTaken
+      .filter((b) => b.booking_date === dStr)
+      .map((b) => ({ start_minutes: b.start_minutes, duration_minutes: b.duration_minutes }));
+    const open = generateAvailableSlots(dStr, duration, taken, todayStr, nowMinutes);
+    return { status: open.length > 0 ? 'available' : 'full', dStr };
+  }
+
+  function goPrevMonth() {
+    const m = viewMonth === 0 ? 11 : viewMonth - 1;
+    const y = viewMonth === 0 ? viewYear - 1 : viewYear;
+    onMonthChange(y, m);
+  }
+  function goNextMonth() {
+    const m = viewMonth === 11 ? 0 : viewMonth + 1;
+    const y = viewMonth === 11 ? viewYear + 1 : viewYear;
+    onMonthChange(y, m);
+  }
+
+  const cells = [];
+  for (let i = 0; i < startWeekday; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
   return (
     <div>
-      <div className="flex gap-2.5 overflow-x-auto pb-4 mb-2">
-        {days.map((d) => {
-          const dObj = new Date(d + 'T00:00:00');
-          const closed = dObj.getDay() === 0;
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={goPrevMonth} className="w-8 h-8 flex items-center justify-center bg-white border border-line rounded-lg">‹</button>
+        <div className="font-display font-semibold text-lg">{monthLabel}</div>
+        <button onClick={goNextMonth} className="w-8 h-8 flex items-center justify-center bg-white border border-line rounded-lg">›</button>
+      </div>
+
+      <div className="flex items-center gap-4 mb-3 font-mono text-[10px] uppercase text-ink60">
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green inline-block"></span>Selected</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-rose inline-block"></span>Fully booked</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-paper2 border border-line inline-block"></span>Closed</span>
+        {monthLoading && <span>Loading…</span>}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1.5 mb-2 font-mono text-[10px] uppercase text-ink60 text-center">
+        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d) => <div key={d}>{d}</div>)}
+      </div>
+      <div className="grid grid-cols-7 gap-1.5 mb-6">
+        {cells.map((dayNum, i) => {
+          if (dayNum === null) return <div key={`blank-${i}`} />;
+          const { status, dStr } = dayStatus(dayNum);
+          const isSelected = date === dStr;
+          const disabled = status === 'past' || status === 'closed' || status === 'full';
+          let cls = 'bg-white border-line text-ink';
+          if (isSelected) cls = 'bg-green border-green text-white font-semibold';
+          else if (status === 'past') cls = 'bg-white border-line text-ink40 opacity-40';
+          else if (status === 'closed') cls = 'bg-paper2 border-line text-ink40';
+          else if (status === 'full') cls = 'bg-rose-soft border-rose text-rose';
           return (
-            <button key={d} disabled={closed} onClick={() => onDate(d)}
-              className={`flex-shrink-0 w-16 py-3 rounded-xl border text-center ${closed ? 'opacity-30' : ''} ${date === d ? 'bg-green border-green text-white' : 'bg-white border-line'}`}>
-              <div className="text-[11px] uppercase">{dObj.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-              <div className="font-display font-semibold text-lg">{dObj.getDate()}</div>
+            <button key={dStr} disabled={disabled} onClick={() => onDate(dStr)}
+              className={`aspect-square rounded-lg border text-sm font-mono flex items-center justify-center relative ${cls} ${disabled ? 'cursor-not-allowed' : 'hover:border-ink40'}`}>
+              {dayNum}
+              {status === 'full' && <span className="absolute bottom-1 text-[8px] font-mono">Full</span>}
             </button>
           );
         })}
       </div>
-      {!date && <p className="italic text-sm text-ink60 py-5">Pick a date above to see open times.</p>}
-      {date && slots.length === 0 && <p className="italic text-sm text-ink60 py-5">No open times that day — try another date.</p>}
+
+      {!date && <p className="italic text-sm text-ink60 py-2">Pick a date above to see open times.</p>}
+      {date && slots.length === 0 && <p className="italic text-sm text-ink60 py-2">No open times that day — try another date.</p>}
       {date && slots.length > 0 && (
         <div className="grid grid-cols-3 md:grid-cols-4 gap-2.5 mb-6">
           {slots.map((m) => {
